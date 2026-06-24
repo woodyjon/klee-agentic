@@ -1,0 +1,8 @@
+# Vidéo de la démo — lourde, non versionnée (déposer manuellement avant la présentation)
+assets/demo-ebg.mp4
+
+# Artefacts playwright-cli (captures, snapshots de vérif du rendu)
+.playwright-cli/
+
+# macOS
+.DS_Store

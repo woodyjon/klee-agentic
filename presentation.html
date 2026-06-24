@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="assets/klee-favicon.ico">
+<title>Choisir ses technologies d'agents — EBG 25 juin 2026</title>
+<style>
+  :root{
+    /* ---- palette de marque Klee Group ---- */
+    --ink:#1b1422; --mut:#6b6675; --faint:#b6b0bf; --line:#e0dce6;
+    --bg:#fff; --hl:#f3f0f8; --paper:#faf8fc;
+    --purple:#3d0d80;        /* violet profond — accent fort (badges, boîtes) */
+    --purple2:#5f14bf;
+    --violet:#7e1aff;
+    --magenta:#8c2b8a;
+    --coral:#cf4d38;         /* corail — accent secondaire (soulignés, emphase) */
+    --coral2:#eb8156;
+    --grad:linear-gradient(125deg,#3d0d80 0%,#5f14bf 32%,#8c2b8a 62%,#cf4d38 100%);
+    --go:#3d0d80;            /* accent "ne stressez pas" — repris dans la marque */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#e7e4ec}
+  body{
+    color:var(--ink);
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ---------- scène scalée pour projecteur ---------- */
+  #viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #stage{
+    position:relative;width:1280px;height:720px;background:var(--bg);
+    transform-origin:center center;box-shadow:0 10px 40px rgba(0,0,0,.18);
+    overflow:hidden;
+  }
+
+  .slide{
+    position:absolute;inset:0;padding:64px 80px;
+    opacity:0;visibility:hidden;transition:opacity .25s ease;
+    display:flex;flex-direction:column;
+  }
+  .slide.active{opacity:1;visibility:visible}
+
+  .kicker{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--coral);font-weight:700;margin-bottom:16px}
+  h2.t{font-size:43px;font-weight:680;letter-spacing:-.015em;line-height:1.1;margin:0;padding-bottom:12px;position:relative}
+  h2.t::after{content:"";position:absolute;left:0;bottom:0;width:104px;height:4px;background:var(--coral);border-radius:2px}
+  h2.t .lite{color:var(--mut);font-weight:500}
+  .lead{font-size:24px;color:var(--mut);line-height:1.45;margin-top:18px;max-width:980px}
+
+  .frag{opacity:0;transform:translateY(8px);transition:opacity .28s ease,transform .28s ease}
+  .frag.on{opacity:1;transform:none}
+
+  .spacer{flex:1}
+
+  /* footer / chrome orateur */
+  .pagenum{position:absolute;right:22px;bottom:16px;font-size:13px;color:var(--faint)}
+  .who{position:absolute;left:80px;bottom:20px;font-size:13px;color:var(--faint);letter-spacing:.04em}
+  .who b{color:var(--mut);font-weight:600}
+
+  /* nav arrows */
+  .nav{position:fixed;bottom:14px;right:18px;display:flex;gap:8px;z-index:50;transition:opacity .35s ease}
+  .nav button{width:34px;height:34px;border-radius:8px;border:1px solid #cfcfcf;background:#fff;color:#555;font-size:16px;cursor:pointer}
+  .nav button:hover{border-color:#888;color:#111}
+  /* mode présentation propre : la nav + l'aide s'effacent quand la souris est immobile */
+  body.idle .nav,body.idle #help{opacity:0;pointer-events:none}
+
+  /* minuteur + notes */
+  #timer{position:fixed;left:16px;top:14px;z-index:50;background:#111;color:#fff;font:600 14px ui-monospace,monospace;padding:5px 12px;border-radius:8px;display:none}
+  #timer.show{display:block}
+  #notes{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#111;color:#eee;padding:14px 24px;font-size:15px;line-height:1.5;display:none;border-top:2px solid #333}
+  #notes.show{display:block}
+  #notes b{color:#fff}
+  #help{position:fixed;left:16px;bottom:14px;z-index:50;font-size:12px;color:#9a9a9a;transition:opacity .35s ease}
+
+  /* ---------- composants ---------- */
+  .big{font-size:84px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .big.sub{font-size:40px;color:var(--mut);font-weight:700}
+  .em{font-weight:800}
+
+  /* échelle (ladder) */
+  .ladder{display:flex;flex-direction:column-reverse;gap:10px;margin-top:8px}
+  .rung{display:flex;align-items:center;gap:20px;border:1.5px solid var(--line);border-radius:12px;padding:13px 18px;background:#fff}
+  .rung .n{flex:none;width:40px;height:40px;border-radius:9px;background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px}
+  .rung .nm{font-size:21px;font-weight:700}
+  .rung .desc{font-size:15px;color:var(--mut);margin-top:2px}
+  .rung .fam{margin-left:auto;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:700;white-space:nowrap}
+  .rung[data-fam="gen"] .n{background:var(--purple)}
+  .rung[data-fam="ag"] .n{background:var(--coral)}
+  .rung[data-fam="ag"] .fam{color:var(--coral)}
+  .rung[data-fam="ag"]{border-color:var(--coral2)}
+  /* colonne « cas de Léa » accolée à chaque échelon (fusion échelle + persona) */
+  .rung .lvlblock{flex:none;width:235px}
+  .rung .lea{flex:1;font-size:14.5px;color:var(--ink);line-height:1.32;border-left:3px solid var(--coral2);padding-left:14px}
+  .rung .lea i{color:var(--mut);font-style:italic}
+
+  /* table persona */
+  table.grid{border-collapse:collapse;width:100%;margin-top:14px;font-size:17px}
+  table.grid th{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:left;padding:6px 14px;font-weight:700}
+  table.grid td{padding:11px 14px;border-top:1px solid var(--line);vertical-align:top}
+  table.grid td.lvl{font-weight:800;white-space:nowrap;width:60px}
+  table.grid td.uc{width:54%}
+  table.grid td.tech{color:var(--mut);font-size:15px}
+  table.grid tr.row{opacity:0;transform:translateY(8px);transition:opacity .28s,transform .28s}
+  table.grid tr.row.on{opacity:1;transform:none}
+
+  /* stack 3 couches */
+  .layers{display:flex;flex-direction:column;gap:14px;margin-top:10px}
+  .layer{display:flex;align-items:center;gap:24px;border:1.5px solid var(--line);border-radius:13px;padding:18px 24px}
+  .layer .lk{flex:none;width:150px;font-size:22px;font-weight:780}
+  .layer .lk small{display:block;font-size:13px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+  .layer .lv{font-size:16px;color:var(--mut);line-height:1.4}
+  .layer .lv code{background:var(--hl);padding:1px 7px;border-radius:5px;font-size:14px;color:var(--purple2)}
+  .layer .badge{margin-left:auto;flex:none;font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;border:1.5px solid var(--purple);color:var(--purple);white-space:nowrap}
+  .gomsg{margin-top:18px;border-left:5px solid var(--coral);background:linear-gradient(90deg,#f3f0f8,#fbf3f1);padding:14px 20px;border-radius:0 10px 10px 0;font-size:17px;line-height:1.45}
+  .gomsg b{color:var(--purple)}
+
+  /* code / no-code / code */
+  .pend{display:flex;flex-direction:column;align-items:center;flex:1;justify-content:space-evenly;margin-top:8px}
+  .flow{display:flex;align-items:center;gap:22px;font-size:30px;font-weight:780}
+  .flow .arr{color:var(--coral);font-size:26px}
+  .flow .mid{color:var(--mut)}
+  .flow small{display:block;font-size:14px;font-weight:600;color:var(--faint);margin-top:4px;text-align:center}
+  .flow .end{position:relative}
+  .pquote{font-size:24px;font-style:italic;color:var(--ink);margin-top:6px}
+  .selfref{font-size:14px;color:var(--faint);margin-top:4px}
+  /* captures transitoires (n8n, markdown) : overlay centré « modal » quasi plein écran, visible une seule étape
+     (cf. .flashfrag dans show()) — couvre franchement le reste le temps du « regardez », puis disparaît.
+     Scène = canevas fixe 1280x720 → dimensions en px (pas de vw/vh). Images limitées par la hauteur. */
+  .flashfrag{position:absolute;left:50%;top:50%;margin:0;z-index:6;transform:translate(-50%,-50%) translateY(10px)}
+  .flashfrag.on{transform:translate(-50%,-50%)}
+  .flashfrag img{display:block;height:636px;width:auto;max-width:1180px;border-radius:11px;border:3px solid var(--purple);box-shadow:0 22px 60px rgba(61,13,128,.34);background:#fff}
+  /* note de marge « à noter » — remplace l'émoji ⚠️ hors charte */
+  .notebar{margin-top:auto;border-left:4px solid var(--coral);background:var(--paper);padding:12px 18px;border-radius:0 10px 10px 0;font-size:17px;line-height:1.45;display:flex;align-items:baseline;gap:13px}
+  .notebar .nb-tag{flex:none;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--coral);padding:3px 10px;border-radius:6px}
+  .notebar b{color:var(--purple)}
+
+  /* menu des questions du brief (slide « la question posée ») */
+  .qmenu{display:flex;flex-direction:column;gap:22px;margin-top:22px;max-width:1060px}
+  .qrow{position:relative;display:flex;align-items:baseline;gap:18px;border-left:3px solid var(--coral2);background:linear-gradient(90deg,var(--paper),transparent);padding:9px 0 9px 16px;border-radius:0 8px 8px 0}
+  .qrow .qcat{flex:none;width:205px;font-size:15px;font-weight:800;color:var(--purple);line-height:1.25}
+  .qrow .qopt{font-size:17px;color:var(--ink);line-height:1.35}
+  .qrow .vs{color:var(--coral);font-weight:800;font-style:normal;padding:0 2px}
+  .qrow .qopt code{background:var(--hl);padding:1px 6px;border-radius:5px;font-size:14px;color:var(--purple2)}
+  .qrow .qopt small{color:var(--mut);font-size:15px}
+  /* badge-verdict (gag « j'expédie la présentation ») — sceau étoile « tamponné », plus large que haut */
+  .qbadge{position:absolute;right:8%;top:50%;z-index:3;display:inline-flex;align-items:center;text-align:center;justify-content:center;
+    min-width:96px;max-width:250px;height:48px;padding:0 20px;box-sizing:border-box;
+    transform:translateY(-50%) rotate(-3deg);
+    background:var(--coral);color:#fff;font-size:14px;font-weight:900;line-height:1.08;letter-spacing:.005em;
+    border-radius:12px;box-shadow:0 5px 13px rgba(207,77,56,.38)}
+  .qrow:nth-child(4) .qbadge{min-width:280px;max-width:300px}  /* « Parfait si… » : badge plus large, tient sur 2 lignes */
+  .qbadge.frag.on{animation:stamp .26s cubic-bezier(.34,1.56,.64,1) both}
+  @keyframes stamp{0%{transform:translateY(-50%) rotate(-3deg) scale(1.9);opacity:0}60%{opacity:1}100%{transform:translateY(-50%) rotate(-3deg) scale(1);opacity:1}}
+
+  /* le vrai chantier (slide « implémenter son premier agent ») — 5 étapes, la techno = la petite case */
+  .chantier{display:flex;flex-direction:column;gap:11px;margin-top:20px;max-width:1080px}
+  .cstep{display:flex;align-items:center;gap:18px;border-radius:11px;padding:13px 20px;border-left:4px solid var(--coral);background:linear-gradient(90deg,#fbf3f1,transparent)}
+  .cstep .cnum{flex:none;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;background:var(--coral)}
+  .cstep .cbody{flex:1;min-width:0}
+  .cstep .ctitle{font-size:20px;font-weight:800;color:var(--ink);line-height:1.15}
+  .cstep .cdet{font-size:14.5px;color:var(--mut);line-height:1.3;margin-top:2px}
+  .cstep .cdet b{color:var(--purple);font-weight:700}
+  .cstep .ctag{flex:none;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--coral);padding:5px 12px;border-radius:999px;white-space:nowrap}
+  /* étape 2 = le choix de techno : même taille que les autres, mais couleur violette (« le plus simple ») */
+  .cstep.easy{border-left:4px solid var(--purple);background:var(--hl)}
+  .cstep.easy .cnum{background:var(--purple)}
+  .cstep.easy .ctitle{color:var(--purple)}
+  .cstep.easy .ctag{color:var(--purple);background:transparent;border:1.5px solid var(--purple)}
+  /* le badge « non bloquant » apparaît EN MÊME TEMPS que la notebar (au 1er clic), pas avec sa carte */
+  .ctag.pending{opacity:0;transform:translateY(8px);transition:opacity .28s ease,transform .28s ease}
+  .slide:has(.notebar.frag.on) .ctag.pending{opacity:1;transform:none}
+
+  /* démo */
+  .videobox{flex:1;margin-top:18px;border:2px dashed var(--violet);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--hl);overflow:hidden}
+  /* quand la vidéo joue : on retire le cadre pointillé + le fond (plus d'« ancien rectangle » derrière) et la vidéo occupe tout le bloc */
+  .videobox.playing{border:none;background:transparent;margin-top:10px}
+  .videobox .pl{font-size:20px;color:var(--purple2);font-weight:600}
+  .videobox .money{font-size:16px;color:var(--ink);background:#fff;border:1px solid var(--line);border-left:4px solid var(--coral);border-radius:10px;padding:10px 18px;max-width:640px;text-align:center}
+  .videobox .money b{color:var(--purple)}
+  /* object-fit:contain = vidéo entière visible (jamais coupée en bas), aussi grande que possible dans le bloc */
+  .videobox video{width:100%;height:100%;object-fit:contain;border-radius:12px}
+
+  /* souveraineté ladder */
+  .truths{display:flex;gap:16px;margin-top:6px}
+  .truth{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:14px 18px;font-size:16px;line-height:1.4}
+  .truth .lab{display:block;font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:6px;font-weight:700}
+  .sov{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+  .sovrow{display:flex;align-items:center;gap:18px;border:1.5px solid var(--line);border-radius:10px;padding:10px 16px;font-size:16px}
+  .sovrow .s{flex:none;width:30px;height:30px;border-radius:7px;border:1.5px solid var(--purple);color:var(--purple);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  .sovrow .sl{font-weight:700}
+  .sovrow .sd{color:var(--mut);font-size:14px;margin-left:auto;text-align:right}
+
+  /* takeaway */
+
+  .take{display:flex;flex-direction:column;flex:1;justify-content:space-evenly;margin-top:18px}
+  .takeitem{display:flex;gap:22px;align-items:flex-start}
+  .takeitem .k{font-size:15px;font-weight:800;letter-spacing:.08em;background:var(--purple);color:#fff;padding:6px 12px;border-radius:8px;flex:none;margin-top:4px}
+  .takeitem:nth-child(3) .k{background:var(--coral)}
+  .takeitem .v{font-size:21px;font-weight:600;line-height:1.35}
+  .takeitem .v small{display:block;font-size:15px;color:var(--mut);font-weight:500;margin-top:4px}
+
+  /* closing */
+  .closing{display:flex;flex-direction:column;justify-content:center;height:100%;text-align:left}
+  .closing .pun{font-size:42px;font-weight:780;letter-spacing:-.02em;line-height:1.15;max-width:1000px}
+  .closing .pun em{font-style:normal;border-bottom:4px solid var(--ink)}
+  .closing .contacts{margin-top:30px;display:flex;flex-direction:column;gap:14px}
+  .closing .person .who{display:block;font-size:22px;font-weight:700}
+  .closing .person .mail{display:block;font-size:15px;color:var(--mut);margin-top:2px}
+  .closing .dl{margin-top:26px;font-size:18px}
+  .closing .dl .url{font-weight:800}
+  .closing .sig{margin-top:28px;font-size:16px;color:var(--mut)}
+  /* QR de téléchargement (slide clôture) — carte blanche pour scan net sur le dégradé */
+  .cover-close .closing{padding-right:300px}
+  .cover-close .dlqr{position:absolute;right:84px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:13px;z-index:3}
+  .cover-close .qrcard{background:#fff;padding:15px;border-radius:16px;box-shadow:0 14px 38px rgba(0,0,0,.30)}
+  .cover-close .qrcard img{display:block;width:214px;height:214px}
+  .cover-close .qrcap{color:#fff;font-size:15px;font-weight:600;max-width:236px;text-align:center;line-height:1.32}
+
+  .tagline{font-size:18px;color:var(--mut);margin-top:22px;line-height:1.5}
+
+  /* use case concret — 3 cartes */
+  .uc3{display:flex;gap:16px;margin-top:20px}
+  .uc3 .card{flex:1;border:1.5px solid var(--line);border-radius:13px;padding:18px 20px}
+  .uc3 .card.accent{border-color:var(--purple);border-width:2px;background:linear-gradient(180deg,#faf8fc,#fff)}
+  .uc3 .card.accent h4{color:var(--coral)}
+  .uc3 .card h4{margin:0 0 10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .uc3 .card p{margin:0;font-size:17px;line-height:1.5}
+  .uc3 .card p b{font-weight:700}
+  .uc3 .card .lvl{display:inline-block;margin-top:12px;font-size:13px;font-weight:700;border:1.5px solid var(--purple);color:var(--purple);border-radius:999px;padding:4px 12px}
+
+  /* archi AWS — schéma */
+  .archi{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+  .archi .modelbar{align-self:center;border:1.5px solid var(--purple);color:var(--purple);border-radius:10px;padding:9px 20px;font-size:16px;font-weight:600}
+  .archi .modelbar code{font-family:ui-monospace,monospace;background:var(--hl);padding:1px 7px;border-radius:5px;font-size:14px}
+  .archi .modelbar b{color:var(--ink)}
+  .archi .flowrow{display:flex;align-items:stretch;gap:12px;justify-content:center}
+  .archi .col{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column}
+  .archi .col.center{border:none;background:var(--grad);color:#fff;align-items:center;text-align:center;justify-content:center}
+  .archi .col h4{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .archi .col.center h4{color:rgba(255,255,255,.78)}
+  .archi .col .item{font-size:15px;padding:3px 0;line-height:1.35}
+  .archi .col .item code{font-family:ui-monospace,monospace;background:var(--hl);padding:1px 6px;border-radius:5px;font-size:13px}
+  .archi .col.center .big2{font-size:21px;font-weight:760}
+  .archi .col.center .sm{font-size:13px;color:rgba(255,255,255,.88);margin-top:4px}
+  .archi .col.center .sm code{background:rgba(255,255,255,.18);color:#fff}
+  .archi .col.center .sm b{color:#fff}
+  .archi .conn{display:flex;align-items:center;color:var(--coral);font-size:24px;font-weight:700}
+  .archi .socle{border:1.5px solid var(--purple);background:var(--hl);border-radius:12px;padding:12px 18px;font-size:14px;text-align:center;line-height:1.4}
+  .archi .socle b{color:var(--purple)}
+  .archi .socle b{font-weight:700}
+  .archi .foot{text-align:center;font-size:14px;color:var(--mut)}
+
+  /* ---------- maquette d'archi réutilisable (boîtes qui s'allument) ---------- */
+  .boardwrap{display:flex;flex-direction:column;gap:14px;margin-top:16px;flex:1}
+  .boardMount{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .board{display:flex;flex-direction:column;gap:16px;width:100%}
+  .bband{display:flex;align-items:stretch;gap:12px}
+  .blabel{flex:none;width:118px;display:flex;align-items:center;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);line-height:1.1}
+  .brow{display:flex;gap:10px;flex:1}
+  .box{flex:1 1 0;min-width:0;border-radius:10px;padding:9px 11px;border:1.5px solid var(--line);background:#fff;min-height:80px;display:flex;flex-direction:column;justify-content:center;transition:border-color .3s ease,background .3s ease,box-shadow .3s ease,color .3s ease,opacity .3s ease}
+  .box .bx-t{font-size:12.6px;font-weight:740;line-height:1.12}
+  .box .bx-s{font-size:10px;color:var(--mut);margin-top:2px;line-height:1.12}
+  .box.off{border-style:dashed;border-color:#dcd6e6;background:#fbfafd;opacity:.55}
+  .box.off .bx-t{color:#b3abc2;font-weight:680}
+  .box.off .bx-s{color:#c7c0d4}
+  .box.on{border-color:var(--purple);background:#fff;box-shadow:0 3px 12px rgba(61,13,128,.08)}
+  .box.on .bx-t{color:var(--purple)}
+  .box.intense{border:2px solid var(--coral);background:var(--purple);box-shadow:0 7px 20px rgba(61,13,128,.30)}
+  .box.intense .bx-t{color:#fff}
+  .box.intense .bx-s{color:rgba(255,255,255,.86)}
+  .box .bx-aws{font-size:10.5px;color:var(--coral);font-weight:700;margin-top:3px;letter-spacing:.01em}
+  .box.intense .bx-aws{color:#ffd9cf}
+  .box.off .bx-aws{display:none}
+  /* légende + caption d'échelon */
+  .blegend{display:flex;gap:16px;font-size:11.5px;color:var(--mut);align-items:center;flex-wrap:wrap}
+  .blegend b{font-weight:700;color:var(--ink)}
+  .blegend .lg{display:inline-flex;align-items:center;gap:5px}
+  .lgchip{width:13px;height:13px;border-radius:4px;display:inline-block}
+  .lgchip.on{border:1.5px solid var(--purple);background:#fff}
+  .lgchip.intense{border:2px solid var(--coral);background:var(--purple)}
+  .lgchip.off{border:1.5px dashed #dcd6e6;background:#fbfafd}
+  .boardcap{display:flex;align-items:center;gap:18px;min-height:58px;border-top:2px solid var(--line);padding-top:11px}
+  .boardcap .echip{flex:none;display:flex;align-items:center;gap:12px}
+  .boardcap .en{font-size:30px;font-weight:820;color:var(--coral);line-height:1}
+  .boardcap .enm{font-size:19px;font-weight:760}
+  .boardcap .epost{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border:1.5px solid var(--purple);color:var(--purple);border-radius:999px;padding:3px 11px;white-space:nowrap}
+  .boardcap .enote{font-size:15.5px;color:var(--mut);line-height:1.35}
+  .boardcap .enote b{color:var(--ink)}
+  .boardpunch{font-size:16px;line-height:1.4;border-left:4px solid var(--coral);background:var(--paper);padding:10px 16px;border-radius:0 9px 9px 0;opacity:0;transition:opacity .3s ease}
+  .boardpunch.show{opacity:1}
+  .boardpunch b{color:var(--purple)}
+  .boardfoot{text-align:center;font-size:14px;color:var(--mut);margin-top:4px}
+  .boardfoot b{color:var(--purple)}
+
+  /* ---------- chrome de marque Klee ---------- */
+  #brandlogo{position:absolute;top:30px;right:34px;height:30px;z-index:5;opacity:.96}
+  .brandfoot{position:absolute;right:24px;bottom:15px;font-size:12px;color:var(--faint);letter-spacing:.04em;text-align:right;line-height:1.25;z-index:5}
+  .brandfoot b{display:block;color:var(--mut);font-weight:600;font-size:12px}
+  .pagenum{right:24px;bottom:15px}
+  /* sur les slides de couverture (dégradé), on masque le chrome clair */
+  #stage.coverbg #brandlogo,#stage.coverbg .brandfoot,#stage.coverbg .pagenum{display:none}
+
+  /* ---------- slides de couverture (dégradé Klee) ---------- */
+  .slide.cover{background:var(--grad);color:#fff;padding:70px 80px;overflow:hidden}
+  .slide.cover .kicker{color:rgba(255,255,255,.82)}
+  .slide.cover h2.t{color:#fff}
+  .slide.cover h2.t::after{background:rgba(255,255,255,.9)}
+  .slide.cover .lead{color:rgba(255,255,255,.9)}
+  .slide.cover .who{position:static;color:rgba(255,255,255,.85);font-size:14px}
+  .slide.cover .who b{color:#fff}
+  .cover-logo{align-self:flex-start;width:auto;height:44px;margin-bottom:6px}
+  .cover .cover-foot{position:absolute;left:80px;right:80px;bottom:34px;display:flex;justify-content:space-between;font-size:14px;color:rgba(255,255,255,.82);z-index:3}
+  .cover .swirl{position:absolute;top:-150px;right:-150px;width:430px;height:430px;opacity:.28;pointer-events:none;z-index:1}
+  .cover>*{position:relative;z-index:2}
+  /* la couverture de titre = épurée (pas de motif), la clôture garde un accent discret en coin */
+  .cover-title{justify-content:center}
+  .cover-title .lead{max-width:760px}
+  .slide.cover .closing .pun em{border-bottom-color:rgba(255,255,255,.92)}
+  .slide.cover .closing .sig,.slide.cover .closing .person .mail{color:rgba(255,255,255,.78)}
+
+  /* ---------- archi AWS réelle (image du diagramme drawio du cas de démo RestoAgent) ---------- */
+  .archireal{padding:30px 50px 24px}
+  .archishot{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin-top:12px}
+  .archishot img{max-width:100%;max-height:100%;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:#fff;box-shadow:0 6px 22px rgba(61,13,128,.10)}
+
+  /* ---------- slides « offre Klee » (repro corporate : Conseil & Déploiement / Focus AI & Data) ----------
+     charte navy/orange d'origine des slides fournies — volontairement distincte de la charte violet/corail du deck */
+  .koffer{padding:30px 46px 24px;gap:0}
+  .koff-title{font-size:30px;font-weight:800;color:#1c2c4d;text-align:center;line-height:1.14;margin:0 130px 13px;letter-spacing:-.012em}
+  .koff-title small{display:block;font-weight:800;font-size:30px}
+  .koff-title .kg{color:#e8562e}
+  .koff-banner{position:relative;border-radius:7px;padding:10px 28px 10px 64px;color:#fff;display:flex;flex-direction:column;justify-content:center;min-height:50px;text-align:center}
+  .koff-banner.navy{background:#1c2c4d}
+  .koff-banner.coral{background:#e8562e;margin-top:11px}
+  .koff-banner .kb-ico{position:absolute;left:22px;top:50%;transform:translateY(-50%);width:27px;height:27px;color:#fff}
+  .koff-banner .kb-ttl{font-size:17px;font-weight:800;line-height:1.2}
+  .koff-banner .kb-txt{font-size:14.5px;line-height:1.32}
+  .koff-banner .kb-ttl + .kb-txt{margin-top:2px}
+  .koff-banner .kb-txt b{font-weight:800}
+  .koff-sec{font-size:12.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#1c2c4d;margin:12px 0 7px}
+  .koff-grid{display:grid;gap:11px}
+  .koff-grid.g3{grid-template-columns:repeat(3,1fr)}
+  .koff-grid.g4{grid-template-columns:repeat(4,1fr)}
+  .koff-grid.fill{flex:1}
+  .koff-card{border:1.5px solid #e2e5ec;border-radius:7px;padding:12px 15px;background:#fff;display:flex;flex-direction:column}
+  .koff-card.light{background:#f3f4f8;border-color:#e6e8ef}
+  .kc-head{display:flex;align-items:center;gap:10px;border-bottom:1px solid #dadfe8;padding-bottom:6px;margin-bottom:8px}
+  .kc-title{font-size:16px;font-weight:800;color:#1c2c4d;line-height:1.1;flex:1}
+  .kc-ico{flex:none;width:23px;height:23px;color:#1c2c4d}
+  .kc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+  .kc-list li{position:relative;padding-left:14px;font-size:12.8px;font-style:italic;color:#454b5a;line-height:1.32}
+  .kc-list li::before{content:"";position:absolute;left:2px;top:7px;width:4px;height:4px;border-radius:50%;background:#8a93a6}
+
+  /* ---------- impression PDF ---------- */
+  @media print{
+    @page{size:landscape;margin:0}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    html,body{overflow:visible;background:#fff;height:auto}
+    #viewport{position:static;display:block}
+    #stage{transform:none!important;box-shadow:none;width:100%;height:auto}
+    .nav,#timer,#notes,#help,#brandlogo{display:none!important}
+    .slide{
+      position:relative;inset:auto;opacity:1!important;visibility:visible!important;
+      page-break-after:always;break-after:page;height:100vh;width:100%;
+    }
+    .slide.cover{height:100vh}
+    .frag,table.grid tr.row,.ctag.pending,.boardpunch{opacity:1!important;transform:none!important}
+    .flashfrag{display:none!important} /* captures transitoires (n8n, markdown) — jamais dans le handout/PDF */
+  }
+</style>
+</head>
+<body>
+
+<div id="timer">00:00</div>
+
+<div id="viewport">
+  <div id="stage">
+
+    <!-- TITRE (couverture Klee) -->
+    <section class="slide cover cover-title">
+      <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+        <defs><path id="kswirl" d="M150,66 C214,52 290,82 320,142 C348,198 336,278 284,316 C230,355 148,344 110,294 C74,247 70,150 112,106 C126,90 138,76 150,66 Z"/></defs>
+      </svg>
+      <img class="cover-logo" src="assets/klee-logo-white.png" alt="Klee Group">
+      <div class="spacer"></div>
+      <div class="kicker">EBG · 25 juin 2026</div>
+      <h2 class="t" style="font-size:62px">Choisir ses technologies d'agents</h2>
+      <div class="lead">Une grille de décision, pas un catalogue d'outils.</div>
+      <div style="height:18px"></div>
+      <div class="who"><b>Jonathan Gross</b> · Ingénieur Senior Data &amp; AI &nbsp;—&nbsp; <b>Maxime Lamborelle</b> · Consultant Senior Data &amp; AI</div>
+      <div class="spacer"></div>
+      <div class="cover-foot"><span>25 juin 2026</span><span>Klee Group</span></div>
+    </section>
+
+    <!-- KLEE — CONSEIL & DÉPLOIEMENT (repro de la slide corporate fournie) -->
+    <section class="slide koffer">
+      <h2 class="koff-title"><span class="kg">Klee Group</span> : Conseil &amp; Déploiement</h2>
+      <div class="koff-banner navy">
+        <svg class="kb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="11" rx="2.5"/><path d="M12 4.5v3.5"/><circle cx="12" cy="3.4" r="1.1"/><path d="M9.5 13h.01M14.5 13h.01"/><path d="M9.5 16h5"/><path d="M2.5 12v3M21.5 12v3"/></svg>
+        <div class="kb-txt">La puissance de l'AI, l'expertise de Klee Group : dopez vos services numériques métier, sans compromis sur la qualité et la sécurité.</div>
+      </div>
+      <div class="koff-sec">Conseil &amp; Solutions</div>
+      <div class="koff-grid g3 fill">
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Conseil en Transformation</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.4" r="1.7"/><path d="M11 6 5.5 20M13 6l5.5 14"/><path d="M9 13.5h6"/></svg></div>
+          <ul class="kc-list"><li>Stratégie &amp; cadrage de la transformation</li><li>Conduite du changement &amp; UX/UI</li><li>Innovation &amp; design de service</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Développement applicatif</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 8 4.5 12l4 4M15.5 8l4 4-4 4"/></svg></div>
+          <ul class="kc-list"><li>Solutions sur mesure, évolutives &amp; sécurisées</li><li>Modèles spécifiques, hybride ou low code</li><li>Plateforme modulaire &amp; interopérable</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">FP&amp;A, Conso &amp; ESG</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7.5 14.5l3.5-4.5 3 3 4.5-6.5"/></svg></div>
+          <ul class="kc-list"><li>Pilotage de la performance financière</li><li>Clôture, consolidation &amp; reporting</li><li>Plateformes (OneStream) &amp; ESG</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Solutions Atlassian, EasyVista</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 4.2a1.6 1.6 0 0 1 3.1 0c0 .9.6 1.5 1.5 1.5h2.2v2.2c0 .9.6 1.5 1.5 1.5a1.6 1.6 0 0 1 0 3.1c-.9 0-1.5.6-1.5 1.5v2.2h-2.2c-.9 0-1.5.6-1.5 1.5a1.6 1.6 0 0 1-3.1 0c0-.9-.6-1.5-1.5-1.5H8.3v-2.2c0-.9-.6-1.5-1.5-1.5a1.6 1.6 0 0 1 0-3.1c.9 0 1.5-.6 1.5-1.5V5.7h2.2c.9 0 1.5-.6 1.5-1.5z"/></svg></div>
+          <ul class="kc-list"><li>Partenaire Platinum Atlassian</li><li>Collaboration, agilité &amp; efficacité</li><li>Environnements de travail hybrides</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">AI &amp; Data</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v6c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-6"/><path d="M5 11.5v6c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-6"/></svg></div>
+          <ul class="kc-list"><li>Gouvernance &amp; compliance et valorisation des données</li><li>IA générative, prédictive &amp; agentique</li><li>AI &amp; Data platforms</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Agence digitale</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2a8.8 8.8 0 1 0 0 17.6c1 0 1.6-.8 1.6-1.6 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.9.7-1.6 1.6-1.6h1.8a4.8 4.8 0 0 0 4.8-4.8c0-4.6-4-8.6-9-8.6z"/><circle cx="7.6" cy="11.6" r="1"/><circle cx="10.6" cy="7.6" r="1"/><circle cx="15" cy="8.3" r="1"/></svg></div>
+          <ul class="kc-list"><li>Expériences utilisateurs fluides &amp; sans couture</li><li>Parcours omnicanaux hyper personnalisés</li><li>Engagement &amp; fidélisation</li></ul>
+        </div>
+      </div>
+      <div class="koff-sec">Centre d'excellence</div>
+      <div class="koff-grid g3">
+        <div class="koff-card light">
+          <div class="kc-head"><span class="kc-title">Cybersécurité</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 5.8v4.7c0 4.3 3 7.4 7 8.7 4-1.3 7-4.4 7-8.7V5.8z"/></svg></div>
+          <ul class="kc-list"><li>Sensibilisation, audit technique &amp; Security by Design</li></ul>
+        </div>
+        <div class="koff-card light">
+          <div class="kc-head"><span class="kc-title">DevSecOps</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9.2a2.8 2.8 0 1 0 0 5.6c1.9 0 3-1.9 5-2.8 2-.9 3.1-2.8 5-2.8a2.8 2.8 0 1 1 0 5.6c-1.9 0-3-1.9-5-2.8-2-.9-3.1-2.8-5-2.8z"/></svg></div>
+          <ul class="kc-list"><li>Automatisation, supervision &amp; sécurité intégrées</li></ul>
+        </div>
+        <div class="koff-card light">
+          <div class="kc-head"><span class="kc-title">Cloud</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 18a4 4 0 0 1-.3-8 5.2 5.2 0 0 1 9.9-1.2A3.6 3.6 0 0 1 16.8 18z"/></svg></div>
+          <ul class="kc-list"><li>Adoption, migration &amp; exploitation, FinOps &amp; GreenOps</li></ul>
+        </div>
+      </div>
+      <div class="koff-banner coral">
+        <svg class="kb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="2.8"/><path d="M3.5 18.5a5.5 5.5 0 0 1 11 0"/><circle cx="16.8" cy="9" r="2.1"/><path d="M16 13.6a4.6 4.6 0 0 1 4.5 4.4"/></svg>
+        <div class="kb-txt"><b>Une approche globale, un ancrage métier fort</b> · de l'idée à la solution opérationnelle, durable &amp; industrielle</div>
+      </div>
+    </section>
+
+    <!-- KLEE — FOCUS OFFRE AI & DATA (repro de la slide corporate fournie) -->
+    <section class="slide koffer">
+      <h2 class="koff-title"><span class="kg">Klee Group</span> : Focus sur offre AI &amp; DATA :<small>4 piliers, 2 dimensions transverses.</small></h2>
+      <div class="koff-banner navy">
+        <svg class="kb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 18.5h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.8 10.6c.8.7 1.3 1.5 1.3 2.4h5c0-.9.5-1.7 1.3-2.4A6 6 0 0 0 12 3z"/></svg>
+        <div class="kb-ttl">Conseil – Stratégie AI &amp; Data</div>
+        <div class="kb-txt">Cadrage stratégique, business case, roadmap de transformation - approche pragmatique &amp; agnostique</div>
+      </div>
+      <div class="koff-grid g4 fill">
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Gouvernance Data &amp; AI</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9 12 4l8.5 5"/><path d="M5 9h14"/><path d="M6.5 9.5v8M10 9.5v8M14 9.5v8M17.5 9.5v8"/><path d="M4 20.5h16"/></svg></div>
+          <ul class="kc-list"><li>Data &amp; AI Compliance (RGPD, KYC, IA Act, Agec, PPD, …)</li><li>Data &amp; AI Governance, Observability</li><li>Data Catalog &amp; Lineage</li><li>CDO Dashboard &amp; Data Governance opérationnelle</li><li>Politiques &amp; éthique, Sécurité et conformité</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Architecture AI &amp; Data</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.4" r="1.7"/><path d="M11 6 5.5 20M13 6l5.5 14"/><path d="M9 13.5h6"/></svg></div>
+          <ul class="kc-list"><li>Stacks data modernes, Data Platform</li><li>Data Management &amp; Data Quality</li><li>Plateformes Agentique, AI RAG et ML</li><li>Master Data Architecture</li><li>Infrastructure Cloud</li><li>Standards et bonnes pratiques</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">Build &amp; Run</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.3M12 18.2v2.3M3.5 12h2.3M18.2 12h2.3M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"/></svg></div>
+          <ul class="kc-list"><li>Développer, tester, déployer et opérer des plateformes data modernes &amp; Plateformes AI industrialisées</li><li>Master Data Repository (Customer, Supplier Product, Asset, Location, Employés, …)</li><li>Product Information Management project</li></ul>
+        </div>
+        <div class="koff-card">
+          <div class="kc-head"><span class="kc-title">IA ML, Générative et Agentique</span><svg class="kc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="11" rx="2.5"/><path d="M12 4.5v3.5"/><circle cx="12" cy="3.4" r="1.1"/><path d="M9.5 13h.01M14.5 13h.01"/><path d="M9.5 16h5"/><path d="M2.5 12v3M21.5 12v3"/></svg></div>
+          <ul class="kc-list"><li>Roadmap Data &amp; AI</li><li>Transformation AI &amp; Adoption</li><li>DataScience and ML accelerator (Scoring and valeur Client, Fraude, Risque, …)</li><li>Gouvernance &amp; structuration des corpus documentaire AI RAG</li></ul>
+        </div>
+      </div>
+      <div class="koff-banner coral">
+        <svg class="kb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><path d="M9.5 10.2a2.5 2.5 0 0 1 5 0"/><path d="M3 14.5c1.8-.9 3.6.4 3.6.4l4.4 1.6 4.2-1.1a1.3 1.3 0 0 1 .8 2.4L13.5 20.5l-5.5-1-5 1"/></svg>
+        <div class="kb-ttl">Conduite du changement</div>
+        <div class="kb-txt">Acculturation, montée en compétences, évolution culturelle · alignement &amp; adoption durable</div>
+      </div>
+    </section>
+
+    <!-- LA QUESTION POSÉE — le programme attendu (familles du brief) -->
+    <section class="slide">
+      <div class="kicker">La question posée</div>
+      <h2 class="t">« Choisir ses technologies d'agents »</h2>
+      <div class="qmenu">
+        <div class="qrow frag" data-frag-order="1"><div class="qcat">Frameworks open-source</div><div class="qopt">LangGraph <span class="vs">·</span> CrewAI <span class="vs">·</span> AutoGen <small>— frameworks de développement d'agents (comportement, prompts, tools…)</small></div><div class="qbadge frag" data-frag-order="6">C'est pareil</div></div>
+        <div class="qrow frag" data-frag-order="2"><div class="qcat">Code <span class="vs">vs</span> <span style="white-space:nowrap">Low-code/No-code</span></div><div class="qopt"></div><div class="qbadge frag" data-frag-order="7">Pas important</div></div>
+        <div class="qrow frag" data-frag-order="3"><div class="qcat">Frameworks des clouds</div><div class="qopt">Bedrock Agents <span class="vs">·</span> Vertex Agent Builder <span class="vs">·</span> Foundry Agent Service</div><div class="qbadge frag" data-frag-order="8">C'est pareil</div></div>
+        <div class="qrow frag" data-frag-order="4"><div class="qcat">Frameworks SaaS métier</div><div class="qopt">Agentforce (Salesforce) <small>— agents collés aux données de l'éditeur</small></div><div class="qbadge frag" data-frag-order="9">Parfait si répond au besoin, sur vos données</div></div>
+        <div class="qrow frag" data-frag-order="5"><div class="qcat">Type de modèle &amp; localisation</div><div class="qopt"><span style="white-space:nowrap">API propriétaire</span> <span class="vs">→</span> <span style="white-space:nowrap">API sur AWS/Azure/GCP</span> <span class="vs">→</span> <span style="white-space:nowrap">Modèle sur vos VM (sur AWS/Azure/GCP)</span> <span class="vs">→</span> <span style="white-space:nowrap">Modèle open-source en local</span></div><div class="qbadge frag" data-frag-order="10">Demandez à votre RSSI</div></div>
+      </div>
+      <div class="notebar frag" data-frag-order="11"><span class="nb-tag">Notre angle</span><div>Ces choix technologiques ne sont pas si compliqués.</div></div>
+    </section>
+
+    <!-- LE VRAI CHANTIER — implémenter un agent : la techno = 1 étape sur 5 -->
+    <section class="slide">
+      <div class="kicker">Le vrai chantier</div>
+      <h2 class="t">Implémenter son premier agent</h2>
+      <div class="chantier">
+        <div class="cstep hard"><div class="cnum">1</div><div class="cbody"><div class="ctitle">Définir et cadrer le use case</div><div class="cdet">Audience · intégrations · gouvernance · tests · ...</div></div></div>
+        <div class="cstep easy"><div class="cnum">2</div><div class="cbody"><div class="ctitle">Choisir la techno &amp; l'archi</div></div><div class="ctag pending">non bloquant</div></div>
+        <div class="cstep hard"><div class="cnum">3</div><div class="cbody"><div class="ctitle">Construire</div></div></div>
+        <div class="cstep hard"><div class="cnum">4</div><div class="cbody"><div class="ctitle">Évaluer</div><div class="cdet">Jeux de tests · métriques · non-régression · red-teaming</div></div></div>
+        <div class="cstep hard"><div class="cnum">5</div><div class="cbody"><div class="ctitle">Exploiter</div><div class="cdet">Observabilité · maîtrise des coûts · itération en production</div></div></div>
+      </div>
+      <div class="notebar frag"><span class="nb-tag">Notre angle</span><div>Les choix techno, c'est <b>1 étape sur 5</b> — ne restez pas bloqués dessus. Ce qui va faire réussir (ou échouer) un agent, c'est tout le reste.</div></div>
+    </section>
+
+    <!-- THÈSE / LA MÉTHODE — bien choisir = 3 réflexes -->
+    <section class="slide">
+      <div class="kicker">La méthode</div>
+      <h2 class="t">Bien choisir sa techno d'agent <span class="lite">— en 3 réflexes</span></h2>
+      <div class="spacer"></div>
+      <div class="frag">
+        <div style="font-size:27px;line-height:1.25"><span style="color:var(--coral);font-weight:800">①</span> <b style="color:var(--ink)">Situez le use case sur l'échelle d'autonomie.</b></div>
+        <div style="font-size:17px;color:var(--mut);line-height:1.4;margin:4px 0 0 38px">Le niveau d'autonomie visé commande tout le reste.</div>
+      </div>
+      <div class="frag" style="margin-top:20px">
+        <div style="font-size:27px;line-height:1.25"><span style="color:var(--coral);font-weight:800">②</span> <b style="color:var(--ink)">Bâtissez un socle agentique réutilisable.</b></div>
+        <div style="font-size:17px;color:var(--mut);line-height:1.4;margin:4px 0 0 38px">Un même socle — runtime, mémoire, identité, gateway, garde-fous, observabilité — accueille <b>tous</b> vos use cases, <b>à tous les échelons</b>.</div>
+      </div>
+      <div class="frag" style="margin-top:20px">
+        <div style="font-size:27px;line-height:1.25"><span style="color:var(--coral);font-weight:800">③</span> <b style="color:var(--ink)">Repérez où se loge vraiment le lock-in.</b></div>
+        <div style="font-size:17px;color:var(--mut);line-height:1.4;margin:4px 0 0 38px">Le modèle et le framework se changent ; le runtime, lui, vous engage. Choisissez-le en conscience.</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="lead frag" style="font-size:22px;color:var(--ink);border-left:4px solid var(--coral);padding-left:16px">Le <b style="color:var(--purple)">socle reste le même</b> ; c'est le <b>niveau d'autonomie</b> du use case qui <b style="color:var(--purple)">dimensionne ce qu'on pose dessus</b>.</div>
+    </section>
+
+    <!-- ÉCHELLE D'AUTONOMIE — illustrée par Léa (fusion échelle + persona) -->
+    <section class="slide">
+      <div class="kicker">La colonne vertébrale</div>
+      <h2 class="t">L'échelle d'autonomie <span class="lite">— illustrée par Léa, au Service Client</span></h2>
+      <div class="ladder" style="margin-top:18px">
+        <div class="rung frag" data-fam="gen"><div class="n">1</div><div class="lvlblock"><div class="nm">Chatbot sécurisé</div><div class="desc">résume, reformule, rédige (texte fourni)</div></div><div class="lea">« Résume ce mail de réclamation, corrige mon brouillon de réponse » — sur le texte fourni, le conseiller envoie</div><div class="fam">GenAI · humain</div></div>
+        <div class="rung frag" data-fam="gen"><div class="n">2</div><div class="lvlblock"><div class="nm">Copilot d'entreprise</div><div class="desc">ancré sur les données internes</div></div><div class="lea">Résume l'historique du client <i>+ la politique</i> et rédige la réponse personnalisée</div><div class="fam">GenAI · humain</div></div>
+        <div class="rung frag" data-fam="ag"><div class="n">3</div><div class="lvlblock"><div class="nm">Agent borné</div><div class="desc">accomplit <i>une</i> tâche dans des limites fixées</div></div><div class="lea">Traite le remboursement &lt; seuil, escalade au-dessus, refuse la fraude</div><div class="fam">Agentique · supervisé</div></div>
+        <div class="rung frag" data-fam="ag"><div class="n">4</div><div class="lvlblock"><div class="nm">Agent end-to-end</div><div class="desc">mène une tâche de bout en bout, sous supervision</div></div><div class="lea">Gère la réclamation de bout en bout : remboursement + relivraison + notif</div><div class="fam">Agentique · supervisé</div></div>
+        <div class="rung frag" data-fam="ag"><div class="n">5</div><div class="lvlblock"><div class="nm">Système multi-agents</div><div class="desc">plusieurs agents s'orchestrent à travers les domaines</div></div><div class="lea">Un superviseur orchestre service + logistique + anti-fraude + compta</div><div class="fam">Agentique · gouverné</div></div>
+      </div>
+      <div class="lead frag" style="font-size:18px;margin-top:16px">Le <b>même besoin</b> de Léa gravit l'échelle — plus d'autonomie = plus de <b style="color:var(--ink)">valeur</b> ET plus de <b style="color:var(--ink)">risque</b> à gouverner.</div>
+    </section>
+
+    <!-- L'ARCHITECTURE QUI SE DÉFORME (la maquette d'archi de boîtes) -->
+    <section class="slide" data-board-anim>
+      <div class="kicker">L'architecture qui se déforme</div>
+      <h2 class="t" style="font-size:38px">Une seule archi — les boîtes s'allument selon l'échelon</h2>
+      <div class="boardwrap">
+        <div class="blegend">
+          <span class="lg"><span class="lgchip on"></span> allumée</span>
+          <span class="lg"><span class="lgchip intense"></span> <b>gouvernance renforcée</b></span>
+          <span class="lg"><span class="lgchip off"></span> éteinte</span>
+          <span style="margin-left:auto;color:var(--faint)">le <b>socle partagé</b> sert tous les use cases</span>
+        </div>
+        <div class="boardMount" data-spec="anim"></div>
+        <div class="boardcap" id="boardCap"></div>
+        <div class="boardpunch">L'autonomie ne se paie pas en briques techniques — <b>elle se paie en gouvernance.</b></div>
+      </div>
+      <i class="frag bstep"></i><i class="frag bstep"></i><i class="frag bstep"></i><i class="frag bstep"></i><i class="frag bstep"></i>
+    </section>
+
+    <!-- STACK 3 COUCHES -->
+    <section class="slide">
+      <div class="kicker">La stack démystifiée</div>
+      <h2 class="t">3 couches — un lock-in <span class="lite">différent</span> par couche</h2>
+      <div class="layers">
+        <div class="layer frag"><div class="lk">Modèle<small>le cerveau</small></div><div class="lv">Claude · GPT · Gemini / Llama · Mistral · Qwen — interchangeable via une <b>abstraction API</b> (LLM gateway · <code>LiteLLM</code>)</div><div class="badge">SWAPPABLE</div></div>
+        <div class="layer frag"><div class="lk">Framework<small>où l'on code la logique</small></div><div class="lv"><code>LangGraph</code>/… — il y en a beaucoup : neutres (CrewAI · Pydantic AI) ou alignés cloud (AWS Strands · Google ADK · MS Agent Framework). <b>Le choix importe peu</b>, il dépend surtout du cloud.</div><div class="badge">LE PLUS MINCE</div></div>
+        <div class="layer frag"><div class="lk">Runtime<small>héberge · sécurise · observe</small></div><div class="lv"><code>AWS Bedrock AgentCore</code> — mémoire, identité, gateway/MCP, observabilité. <b>Le vrai lock-in est ici</b> : ces couches <i>stateful</i> managées ne se déménagent pas d'un clic.</div><div class="badge">ALIGNER S/ CLOUD</div></div>
+      </div>
+      <div class="gomsg frag"><b>Ne stressez pas sur le choix du cloud.</b> Bedrock AgentCore ≈ Microsoft Foundry Agent Service ≈ Google Agent Runtime (Gemini Enterprise, ex-Vertex) : <b>même socle</b>, agnostiques au modèle et au framework. On illustre avec AWS — la méthode ne change pas.</div>
+    </section>
+
+    <!-- CODE / NO-CODE / CODE -->
+    <section class="slide">
+      <h2 class="t">Code vs Low-code/No-code</h2>
+      <div class="pend">
+        <div class="flow frag">
+          <div class="mid">Code</div><div class="arr">▶</div>
+          <div class="mid">No-code<small>Zapier · Power Automate · n8n</small></div>
+          <div class="arr">▶</div>
+          <div>Code<small>pour les LLMs</small></div>
+        </div>
+        <figure class="frag flashfrag">
+          <img src="assets/n8n-workflow.png" alt="Workflow no-code dans n8n">
+        </figure>
+        <!-- frag tampon : le clic qui masque la capture n8n n'affiche PAS encore le message (il arrive au clic suivant) -->
+        <i class="frag" hidden></i>
+        <div class="frag" style="text-align:center">
+          <div class="pquote" style="font-style:normal;font-size:26px">Le no-code a donné <b>un peu</b> de pouvoir au business.<br>Les LLM donnent le pouvoir du <b>code</b> à <b>tout le monde</b>.</div>
+        </div>
+        <div class="flow frag" style="font-size:24px">
+          <div class="mid">Word / PowerPoint</div><div class="arr">▶</div>
+          <div>Markdown <span style="font-size:16px;color:var(--faint);font-weight:600">(+ HTML)</span></div>
+        </div>
+        <figure class="frag flashfrag">
+          <img src="assets/markdown%20example.png" alt="Exemple de document en Markdown">
+        </figure>
+        <!-- frag tampon : absorbe le clic qui masque la capture markdown (dernier élément) sans changer de slide -->
+        <i class="frag" hidden></i>
+      </div>
+    </section>
+
+    <!-- LE CAS CONCRET (Maxime ouvre) -->
+    <section class="slide">
+      <div class="kicker">Exemple avec un use case</div>
+      <h2 class="t">L'agent de remboursement de Léa</h2>
+      <div class="spacer"></div>
+      <div class="uc3">
+        <div class="card frag"><h4>Le besoin</h4><p>Un client réclame sur une commande (plat froid, article manquant, retard) : l'agent <b>identifie</b> la clause de la politique, <b>calcule</b> le geste, <b>l'applique</b> ou <b>escalade</b>.</p></div>
+        <div class="card frag"><h4>La contrainte</h4><p>Ça traverse <b>plusieurs systèmes</b> (commandes, paiement, mail). <b>Argent réel</b>, clients authentifiés, tentatives de manipulation. La <b>politique</b> fait foi, pas le LLM.</p></div>
+        <div class="card accent frag"><h4>Ce qu'on attend</h4><p><b>Autonomie bornée :</b> l'agent rembourse sous le seuil (≤ 25 €, ≤ 2 remb./30 j), <b>escalade</b> au-dessus, <b>refuse</b> la fraude.</p><span class="lvl">Échelle : niveau 3–4</span></div>
+      </div>
+      <div class="spacer"></div>
+    </section>
+
+    <!-- ARCHI AWS = maquette d'archi de Léa = sortie de l'outil (résultat concret + secours si l'outil plante) -->
+    <section class="slide">
+      <div class="kicker">Le résultat concret · illustré sur AWS</div>
+      <h2 class="t" style="font-size:36px">La même maquette d'archi — figée sur le cas de Léa, sur AWS</h2>
+      <div class="boardwrap">
+        <div class="blegend">
+          <span style="color:var(--ink);font-weight:700">L'archi de l'agent de remboursement</span>
+          <span class="lg"><span class="lgchip intense"></span> <b>gouvernance renforcée</b> — identité · garde-fous · observabilité</span>
+        </div>
+        <div class="boardMount" data-spec="lea"></div>
+      </div>
+    </section>
+
+    <!-- ARCHI AWS RÉELLE — diagramme drawio du cas de démo (RestoAgent) -->
+    <section class="slide archireal">
+      <div class="kicker">Sous le capot · l'archi réelle du cas de démo</div>
+      <h2 class="t" style="font-size:32px">L'architecture AWS de RestoAgent <span class="lite">— l'implémentation derrière la démo</span></h2>
+      <div class="archishot">
+        <img src="assets/restoagent-arch.drawio.png" alt="Architecture AWS réelle de l'agent RestoAgent : webapp React + FastAPI/ECS (ALB · CloudFront · RDS · Cognito) appelle AgentCore Runtime (Strands + Claude Haiku 4.5), relié à AgentCore Memory, Amazon ECR, Bedrock Claude Haiku 4.5, Bedrock Prompt Management et Amazon Cognito (OIDC/JWT) ; AgentCore Gateway (MCP + JWT Auth) route vers un Lambda Identity Injector → MCP Server (5 tools) et un Lambda KB Retrieve → Bedrock Knowledge Base (Refund Policy) → S3 ; observabilité via Amazon CloudWatch.">
+      </div>
+      <div class="boardfoot" style="margin-top:10px">Les <b>mêmes briques que la maquette</b>, en services AWS réels : <b>AgentCore Runtime</b> (Strands + Claude Haiku 4.5) · <b>Gateway MCP + JWT</b> · <b>Cognito</b> (identité) · <b>AgentCore Memory</b> · <b>Bedrock Knowledge Base</b> (policy de remboursement) + S3 · <b>CloudWatch</b> (observabilité). Outils exposés via un <b>MCP Server</b> (5 tools, identity-bound).</div>
+    </section>
+
+    <!-- DÉMO (la preuve) -->
+    <section class="slide">
+      <h2 class="t">Et voici cette archi en action <span class="lite">(niveau 3–4)</span></h2>
+      <div class="videobox">
+        <!-- La vidéo s'affiche automatiquement si assets/demo-ebg.mp4 est présent (fichier non versionné, cf. .gitignore).
+             Sinon, le placeholder ci-dessous reste affiché — la slide est identique à l'ancienne version.
+             H.264/AAC = lisible dans tout navigateur ; bouton plein écran natif via les contrôles. -->
+        <video id="demovid" src="assets/demo-ebg.mp4" controls preload="metadata" playsinline hidden></video>
+        <div class="pl" id="demopl">▶ &nbsp;Démo — RestoAgent, l'agent de remboursement service client</div>
+      </div>
+    </section>
+
+    <!-- SOUVERAINETÉ -->
+    <section class="slide">
+      <div class="kicker">Souveraineté &amp; confidentialité — « si la donnée ne doit pas sortir d'Europe »</div>
+      <h2 class="t" style="font-size:36px">Où tournent les agents <span class="lite">et</span> les données&nbsp;?</h2>
+      <div class="truths">
+        <div class="truth frag"><span class="lab">Vérité 1</span>« Région EU » ≠ souverain. Le <b>CLOUD Act</b> contraint un fournisseur US quelle que soit la localisation des données.</div>
+        <div class="truth frag"><span class="lab">Vérité 2</span>Pas qu'une affaire de modèle. L'agent touche la donnée par ses <b>outils, sa mémoire et son observabilité</b> (piège : traces vers un SaaS US).</div>
+      </div>
+      <div class="sov">
+        <div class="sovrow frag"><div class="s">1</div><div class="sl">Hyperscaler région EU</div><div class="sd">résidence RGPD — mais juridiction US demeure</div></div>
+        <div class="sovrow frag"><div class="s">2</div><div class="sl">Cloud souverain</div><div class="sd">AWS Eur. Sovereign Cloud · S3NS — juridiction + résidence</div></div>
+        <div class="sovrow frag"><div class="s">3</div><div class="sl">Fournisseur EU (Mistral, OVH,…)</div><div class="sd">stack 100 % EU — modèles frontière un cran derrière</div></div>
+        <div class="sovrow frag"><div class="s">4</div><div class="sl">VPC privé + modèles open-weight</div><div class="sd">la donnée ne sort jamais — vous opérez l'inférence</div></div>
+        <div class="sovrow frag"><div class="s">5</div><div class="sl">On-prem / air-gapped</div><div class="sd">contrôle max — GPT/Claude/Gemini impossibles</div></div>
+      </div>
+      <div class="lead frag" style="font-size:18px;margin-top:14px">Réponse pragmatique : <b>l'hybride par classe de données.</b> Non sensible → meilleure API frontière ; confidentiel → open-weight local ; un <b>AI gateway</b> route selon la sensibilité.</div>
+    </section>
+
+    <!-- À EMPORTER -->
+    <section class="slide">
+      <div class="kicker">À emporter</div>
+      <h2 class="t">3 réflexes pour choisir sa techno d'agents</h2>
+      <div class="take">
+        <div class="takeitem frag"><div class="k">PLACER</div><div class="v">le use case sur l'échelle (1→5). L'échelon décide tout le reste.</div></div>
+        <div class="takeitem frag"><div class="k">MUTUALISER</div><div class="v">un seul socle agentique pour tous vos use cases.<small>runtime · mémoire · identité · gateway · garde-fous · observabilité — bâti une fois, réutilisé à tous les échelons</small></div></div>
+        <div class="takeitem frag"><div class="k">COMMENCER</div><div class="v">bas, gouverner d'abord, monter délibérément.</div></div>
+      </div>
+    </section>
+
+    <!-- CLÔTURE (couverture Klee) -->
+    <section class="slide cover cover-close">
+      <img class="cover-logo" src="assets/klee-logo-white.png" alt="Klee Group">
+      <div class="closing">
+        <div class="pun">Merci.</div>
+        <div class="contacts">
+          <div class="person"><span class="who">Jonathan Gross</span><span class="mail">jonathan.gross@kleegroup.com</span></div>
+          <div class="person"><span class="who">Maxime Lamborelle</span><span class="mail">maxime.lamborelle@kleegroup.com</span></div>
+        </div>
+        <div class="dl">Présentation &amp; outil à télécharger : <span class="url">github.com/woodyjon/klee-agentic</span></div>
+        <div class="sig">Klee Group · EBG, 25 juin 2026</div>
+      </div>
+      <aside class="dlqr">
+        <div class="qrcard"><img src="assets/qr-klee-agentic.png" alt="QR code vers github.com/woodyjon/klee-agentic"></div>
+        <div class="qrcap">Scannez pour la présentation &amp; l'outil</div>
+      </aside>
+      <div class="cover-foot"><span>EBG · 25 juin 2026</span><span>Klee Group</span></div>
+    </section>
+
+    <img id="brandlogo" src="assets/klee-logo.png" alt="Klee Group">
+    <div class="pagenum" id="pagenum"></div>
+  </div>
+</div>
+
+<div class="nav">
+  <button id="prevSlide" title="Slide précédente (↑)">«</button>
+  <button id="prev" title="Étape précédente (←)">‹</button>
+  <button id="next" title="Étape suivante (→)">›</button>
+  <button id="nextSlide" title="Slide suivante (↓)">»</button>
+</div>
+<div id="notes"></div>
+<div id="help">← → étape · ↑ ↓ slide · <b>N</b> notes · <b>T</b> minuteur · <b>F</b> plein écran · <b>P</b> imprimer</div>
+
+<script>
+/* ============ moteur de slides + fragments ============ */
+const stage   = document.getElementById('stage');
+const slides  = Array.from(document.querySelectorAll('.slide'));
+const pagenum = document.getElementById('pagenum');
+const notesEl = document.getElementById('notes');
+let cur = 0, step = 0;
+
+function frags(i){
+  // ordre = DOM par défaut ; surchargeable par data-frag-order (ex. slide « la question posée » :
+  // révéler les lignes d'abord, puis les badges-verdicts, même s'ils sont imbriqués dans les lignes).
+  const arr = Array.from(slides[i].querySelectorAll('.frag, tr.row'));
+  return arr
+    .map((el,idx)=>[el, el.hasAttribute('data-frag-order') ? parseFloat(el.getAttribute('data-frag-order')) : idx])
+    .sort((a,b)=>a[1]-b[1])
+    .map(p=>p[0]);
+}
+
+function show(){
+  slides.forEach((s,i)=>s.classList.toggle('active', i===cur));
+  // met en pause toute vidéo dont on quitte la slide (évite qu'elle continue en fond)
+  document.querySelectorAll('.slide video').forEach(v=>{ if(!slides[cur].contains(v) && !v.paused) v.pause(); });
+  const f = frags(cur);
+  // .flashfrag = fragment « transitoire » : visible uniquement à l'étape où il vient d'être révélé,
+  // il disparaît au clic suivant (ex. capture n8n sur la slide « Code vs Low-code/No-code »).
+  f.forEach((el,idx)=>{
+    if(el.classList.contains('flashfrag')) el.classList.toggle('on', idx===step-1);
+    else el.classList.toggle('on', idx<step);
+  });
+  pagenum.textContent = 'Klee Group   ·   '+(cur+1)+' / '+slides.length;
+  stage.classList.toggle('coverbg', slides[cur].classList.contains('cover'));
+  if(slides[cur].hasAttribute('data-board-anim')){
+    const bm=slides[cur].querySelector('.boardMount[data-spec="anim"]');
+    if(bm) renderBoardEchelon(bm, step);
+    const cap=slides[cur].querySelector('#boardCap');
+    if(cap) renderBoardCap(cap, step);
+    const punch=slides[cur].querySelector('.boardpunch');
+    if(punch) punch.classList.toggle('show', step>=4); // apparaît avec le cas N4
+  }
+  if(notesEl.classList.contains('show')) renderNotes();
+}
+function next(){
+  const f = frags(cur);
+  if(step < f.length){ step++; }
+  else if(cur < slides.length-1){ cur++; step=0; }
+  show();
+}
+function prev(){
+  if(step > 0){ step--; }
+  else if(cur > 0){ cur--; step = frags(cur).length; }
+  show();
+}
+function goto(i){ cur=Math.max(0,Math.min(slides.length-1,i)); step=0; show(); }
+/* saut slide entière (avance/recul rapide) — la slide cible s'affiche tout révélé */
+function nextSlide(){ if(cur < slides.length-1){ cur++; step = frags(cur).length; show(); } }
+function prevSlide(){ if(cur > 0){ cur--; step = frags(cur).length; show(); } }
+
+/* ============ notes orateur ============ */
+function renderNotes(){
+  const n = slides[cur].getAttribute('data-notes') || '';
+  notesEl.innerHTML = '<b>Slide '+(cur+1)+' — notes :</b> '+n;
+}
+
+/* ============ minuteur ============ */
+const timerEl = document.getElementById('timer');
+let t0=null, tHandle=null;
+function fmt(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+function toggleTimer(){
+  if(timerEl.classList.contains('show')){ timerEl.classList.remove('show'); clearInterval(tHandle); tHandle=null; }
+  else{
+    timerEl.classList.add('show');
+    if(!t0) t0 = Date.now();
+    tHandle = setInterval(()=>{ timerEl.textContent = fmt(Date.now()-t0); }, 500);
+  }
+}
+
+/* ============ maquette d'archi réutilisable ============ */
+// Modèle de boîtes ALIGNÉ sur l'outil (agent-archi-tool) : 11 boîtes en 2 zones.
+// Zone use case = spécifique, rebâtie par cas · Socle partagé = bâti une fois, réutilisé.
+// NB : « zone » (use case ↔ socle) ≠ « couche » (le stack de lock-in Modèle/Framework/Runtime, slide « 3 couches ») — deux axes distincts, on garde « couche » pour le seul lock-in.
+const BANDS = [
+  {id:'usecase', label:'Zone use case'},
+  {id:'socle',   label:'Socle partagé'},
+];
+const BOX = [
+  {id:'agent',         band:'usecase', t:"Logique d'agent & prompt",     s:'framework mince'},
+  {id:'tools',         band:'usecase', t:'Outils & connecteurs métier',  s:'actions métier'},
+  {id:'knowledge',     band:'usecase', t:'Connaissance & policy (RAG)',  s:'RAG · règles'},
+  {id:'orchestration', band:'usecase', t:'Orchestration multi-agents',   s:'A2A · échelon 5'},
+  {id:'identity',      band:'socle',   t:'Identité & accès',             s:'moindre privilège'},
+  {id:'runtime',       band:'socle',   t:"Runtime d'agent",             s:'héberge · isole'},
+  {id:'model',         band:'socle',   t:'Modèles (LLM)',                s:'passerelle · switch · FinOps'},
+  {id:'gateway',       band:'socle',   t:'Gateway & outils (MCP)',       s:'connecteurs'},
+  {id:'memory',        band:'socle',   t:'Mémoire & état',               s:'court / long'},
+  {id:'guardrails',    band:'socle',   t:'Guardrails',                   s:'filtres contenu · PII'},
+  {id:'observability', band:'socle',   t:'Observabilité & eval',         s:'traces · évals'},
+];
+// règle d'allumage par échelon (cf. plan §1)
+const ECHELONS = [
+  {n:1, name:'Chatbot sécurisé',      post:'sur votre socle',        on:['model','identity','guardrails','observability'], int:[],
+   note:'Déjà sur <b>votre socle</b> : modèles via une passerelle (switch + <b>FinOps</b>), identité, garde-fous, observabilité. Rien d\'acheté en îlot.'},
+  {n:2, name:"Copilot d'entreprise",  post:'+ RAG · même socle',      on:['model','identity','guardrails','observability','knowledge','memory'], int:[],
+   note:'On ancre sur vos données : <b>RAG</b> + mémoire s\'ajoutent. Toujours le <b>même socle</b>.'},
+  {n:3, name:'Agent borné',           post:'l\'agent agit',          on:['model','identity','guardrails','observability','knowledge','memory','runtime','gateway','agent','tools'], int:[],
+   note:'<b>LA marche :</b> on entre dans l\'<b>agentique</b> — runtime d\'agent + outils s\'allument, le système se met à <b>agir</b>.'},
+  {n:4, name:'Agent end-to-end',      post:'build + HITL',           on:['model','identity','knowledge','memory','runtime','gateway','agent','tools'], int:['guardrails','observability'],
+   note:'Aucune brique en plus — la <b>gouvernance s\'intensifie</b> (garde-fous, évals) : c\'est le prix de l\'autonomie.'},
+  {n:5, name:'Système multi-agents',  post:'gouvernance max',        on:['model','knowledge','memory','runtime','gateway','agent','tools','orchestration'], int:['identity','guardrails','observability'],
+   note:'Une seule boîte en plus (<b>orchestration A2A</b>). Le reste : de la gouvernance qui brille plus fort.'},
+];
+// état figé de Léa (N3) = SORTIE EXACTE du preset Léa de l'outil + labels AWS.
+// 10 boîtes allumées (socle 7/7 + use case 3/4) ; gouvernance renforcée sur identité/garde-fous/observabilité.
+const LEA_SPEC = {
+  on:['model','agent','tools','knowledge','runtime','gateway','memory','identity','guardrails','observability'],
+  int:['identity','guardrails','observability'], off:['orchestration'],
+  aws:{model:'Amazon Bedrock · Claude',
+       /* Strands = framework open-source AWS, pairing natif d'AgentCore (LangGraph reste possible — AgentCore est agnostique) */
+       agent:'Strands Agents SDK', tools:'Lambda · connecteurs', knowledge:'Knowledge Bases for Bedrock',
+       runtime:'Bedrock AgentCore Runtime · région UE', gateway:'AgentCore Gateway', memory:'AgentCore Memory',
+       identity:'AgentCore Identity', guardrails:'Bedrock Guardrails', observability:'AgentCore Observability'}
+};
+function boxState(id, spec){
+  if(spec.int && spec.int.indexOf(id)>=0) return 'intense';
+  if(spec.on && spec.on.indexOf(id)>=0) return 'on';
+  return 'off';
+}
+function renderBoard(mount, spec){
+  mount.innerHTML='';
+  const board=te('div','board');
+  BANDS.forEach(band=>{
+    const sec=te('div','bband');
+    sec.appendChild(te('div','blabel',band.label));
+    const row=te('div','brow');
+    BOX.filter(b=>b.band===band.id).forEach(b=>{
+      const st=boxState(b.id,spec);
+      const el=te('div','box '+st);
+      el.appendChild(te('div','bx-t',b.t));
+      el.appendChild(te('div','bx-s',b.s));
+      if(spec.aws && spec.aws[b.id] && st!=='off') el.appendChild(te('div','bx-aws',spec.aws[b.id]));
+      row.appendChild(el);
+    });
+    sec.appendChild(row);
+    board.appendChild(sec);
+  });
+  mount.appendChild(board);
+}
+function specForEchelon(step){
+  if(step<=0) return {on:[],int:[]};
+  const e=ECHELONS[Math.min(step,ECHELONS.length)-1];
+  return {on:e.on, int:e.int};
+}
+function renderBoardEchelon(mount, step){ renderBoard(mount, specForEchelon(step)); }
+function renderBoardCap(cap, step){
+  cap.innerHTML='';
+  if(step<=0){
+    cap.appendChild(te('div','enote','<b>La maquette de référence.</b>'));
+    return;
+  }
+  const e=ECHELONS[Math.min(step,ECHELONS.length)-1];
+  const chip=te('div','echip');
+  chip.appendChild(te('div','en','N'+e.n));
+  const mid=te('div'); mid.appendChild(te('div','enm',e.name));
+  chip.appendChild(mid);
+  cap.appendChild(chip);
+  cap.appendChild(te('div','enote',e.note));
+}
+initBoards();
+function initBoards(){
+  document.querySelectorAll('.boardMount').forEach(m=>{
+    if(m.dataset.spec==='lea'){ renderBoard(m, LEA_SPEC); return; }
+    renderBoardEchelon(m, 5); // état complet par défaut (impression / accès direct)
+    const cap=m.closest('.slide') && m.closest('.slide').querySelector('#boardCap');
+    if(cap) renderBoardCap(cap, 5);
+  });
+}
+
+/* ============ helper DOM partagé (utilisé par la maquette d'archi) ============ */
+function te(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;}
+/* ============ clavier ============ */
+document.addEventListener('keydown', e=>{
+  switch(e.key){
+    case 'ArrowRight': case 'PageDown': case ' ': e.preventDefault(); next(); break;
+    case 'ArrowLeft':  case 'PageUp':          e.preventDefault(); prev(); break;
+    case 'ArrowDown': e.preventDefault(); nextSlide(); break;
+    case 'ArrowUp':   e.preventDefault(); prevSlide(); break;
+    case 'Home': goto(0); break;
+    case 'End':  goto(slides.length-1); break;
+    case 'n': case 'N': notesEl.classList.toggle('show'); renderNotes(); break;
+    case 't': case 'T': toggleTimer(); break;
+    case 'f': case 'F': if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); break;
+    case 'p': case 'P': window.print(); break;
+  }
+});
+document.getElementById('next').onclick = next;
+document.getElementById('prev').onclick = prev;
+document.getElementById('nextSlide').onclick = nextSlide;
+document.getElementById('prevSlide').onclick = prevSlide;
+
+/* ============ scaling projecteur (contain) ============ */
+function fit(){
+  const s = Math.min(window.innerWidth/1280, window.innerHeight/720);
+  stage.style.transform = 'scale('+s+')';
+}
+window.addEventListener('resize', fit);
+fit();
+
+/* ============ mode scène : effacer nav + aide quand la souris est immobile ============ */
+let idleTimer=null;
+function poke(){
+  document.body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer=setTimeout(()=>document.body.classList.add('idle'), 2600);
+}
+['mousemove','mousedown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,poke,{passive:true}));
+poke();
+
+/* ============ démo : révèle la vidéo si le fichier existe, sinon garde le placeholder ============ */
+(function(){
+  const v = document.getElementById('demovid'), pl = document.getElementById('demopl');
+  if(!v) return;
+  // succès de chargement (métadonnées lues) → on montre la vidéo, on masque le placeholder et on retire le cadre derrière
+  v.addEventListener('loadedmetadata', ()=>{ v.hidden=false; if(pl) pl.hidden=true; v.closest('.videobox').classList.add('playing'); }, {once:true});
+  // échec (fichier absent / illisible) → on laisse le placeholder (cadre pointillé), vidéo masquée
+  v.addEventListener('error', ()=>{ v.hidden=true; if(pl) pl.hidden=false; v.closest('.videobox').classList.remove('playing'); }, {once:true});
+})();
+
+/* ============ deep-link (?s=N pour aller à une slide, tout révélé) ============ */
+(function(){
+  const p = new URLSearchParams(location.search);
+  const s = parseInt(p.get('s'),10);
+  if(!isNaN(s)){ cur = Math.max(0, Math.min(slides.length-1, s-1)); step = frags(cur).length; }
+})();
+show();
+</script>
+</body>
+</html>
